@@ -1,10 +1,5 @@
 #!/usr/bin/python
-
-import socket
-import threading
-import os.path
-import time
-import random
+import socket, threading, os.path, time, random, datetime
 
 
 class Server:
@@ -58,7 +53,7 @@ def showClients():
     for client in clients:
         print client
 
-    back_to_menu()
+    backToMenu()
 
 
 def sendCommand():
@@ -109,14 +104,14 @@ def transferFile():
         raw_input('Invalid selection')
         transferFile()
 
-    back_to_menu()
+    backToMenu()
 
 
 def installOnClient():
     selected = selectionHelper()
 
     if not selected:
-        back_to_menu()
+        backToMenu()
 
     clientsHelper({
         "raw_input_text": "Install: ",
@@ -129,7 +124,7 @@ def removeOnClient():
     selected = selectionHelper()
 
     if not selected:
-        back_to_menu()
+        backToMenu()
 
     clientsHelper({
         "raw_input_text": "Remove: ",
@@ -144,7 +139,7 @@ def sendClientShell():
     selected = selectionHelper('single')
 
     if not selected:
-        back_to_menu()
+        backToMenu()
 
     s = selected[1]['socket']
     addr = selected[1]['addr'][0]
@@ -174,7 +169,7 @@ def selectionHelper(single=False):
 
     if clients.__len__() == 0:
         print "No clients connected!"
-        back_to_menu()
+        backToMenu()
 
     selection = {}
     i = 1
@@ -265,10 +260,9 @@ def clientsHelper(options):
             if len(res) < bufferSize:
                 break
 
-
         time.sleep(1)
 
-    back_to_menu()
+    backToMenu()
 
 
 def fileSendHelper(socket, filePath, fileDest):
@@ -289,26 +283,12 @@ def fileSendHelper(socket, filePath, fileDest):
     return res
 
 
-def proccess_user_selection(option):
-    user_select = {
-        1: showClients,
-        2: sendCommand,
-        3: transferFile,
-        4: installOnClient,
-        5: removeOnClient,
-        6: sendClientShell
-    }
-
-    if not option == '' and option.isdigit() and int(option) in user_select:
-        invoke = user_select[int(option)]
-        invoke()
-
-    else:
-        print "Invalid option"
-        back_to_menu()
+def defaultCase():
+    print "Invalid option"
+    backToMenu()
 
 
-def back_to_menu():
+def backToMenu():
     raw_input('Press enter to contiue...')
     menu()
 
@@ -323,9 +303,18 @@ def menu():
       6) Shell on a client
       """
 
-    user_input = raw_input("-> ")
+    userInput = raw_input("-> ")
 
-    proccess_user_selection(user_input)
+    case = {
+        "1": showClients,
+        "2": sendCommand,
+        "3": transferFile,
+        "4": installOnClient,
+        "5": removeOnClient,
+        "6": sendClientShell
+    }
+
+    case.get(userInput, defaultCase)()  # DAT INVOKE
 
 
 def main():
@@ -335,6 +324,18 @@ def main():
     t = threading.Thread(target=server.listen)
     t.setDaemon(True)
     t.start()
+
+    now = datetime.datetime.now()
+    print """
+    ################################################################
+        Python 102          name: Ivan Radchenko            %s:%s
+    ################################################################
+
+    Segment: no idea which segment supposed to be shown
+    Your dns: %s
+    Your gateway: zubi
+
+    """ % (now.hour, now.minute, socket.gethostbyname(socket.getfqdn()))
 
     menu()
 
