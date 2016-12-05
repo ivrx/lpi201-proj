@@ -20,12 +20,8 @@ class Server:
 
         while True:
             conn, addr = self.s.accept()
-            hostname = socket.gethostbyaddr(addr[0])[0]
             t = threading.Thread(target = self.listenToConnections, args = (conn, addr))
-
-            conns.setConnection("%s - %s" % (hostname, addr[0]), conn, t)
-
-
+            conns.setConnection(addr[0], conn, addr, t)
 
     def listenToConnections(self, conn, addr):
         buffersize = 1024
@@ -48,139 +44,196 @@ class Connections:
     def __init__(self):
         self.connections = {}
 
-    def setConnection(self, hostname, conn, t):
-        self.connections[hostname] = {'socket': conn, 'thread': t}
+    def setConnection(self, ip, conn, addr, t):
+        self.connections[ip] = {'socket': conn, 'addr': addr, 'thread': t}
 
     def getConnections(self):
         return self.connections
 
 
-def show_clients ():
-    print "in show clients"
+def showClients ():
     clients = conns.getConnections()
-
-    print clients
 
     for client in clients:
         print client
 
     back_to_menu()
 
-def send_commands ():
-    clientsHelper('Execute command: ', 'EXEC', send_commands)
+def sendCommand ():
+    selected = selectionHelper()
 
-def transfer_file ():
-    # will need to refactor :/
+    if not selected:
+        print "Wrong selection"
+        sendCommand()
 
-    clients = conns.getConnections()
-    if clients.__len__() == 0:
-        print "No clients connected"
-        back_to_menu()
+    clientsHelper({
+        "raw_input_text": "Execute Command: ",
+        "prefix": "EXEC",
+        "selection": selected,
+    })
 
-    selection = {}
-    i = 1
+def transferFile ():
 
-    for client in clients:
-        print "%d) %s" % (i, client)
-        selection[i] = client
-        i = i + 1
+    selected = selectionHelper()
 
-    select = raw_input('Select a client (0 for all):')
-    flag = False
+    if selected:
 
-    if select.isdigit():
         filePath = raw_input('Source File: ')
 
         if not os.path.exists(filePath):
             print "Cannot locate file"
-            transfer_file()
+            transferFile()
 
-        fileSize = os.path.getsize(filePath)
-        dest = raw_input('Destination path: ')
+        fileDest = raw_input('File Destination: ')
+        if selected.__len__() > 1:
 
-        fileData = open(filePath, 'rb')
-        data = fileData.read(1024)
+            for client in selected:
+                s = selected[client]['socket']
+                addr = selected[client]['addr'][0]
 
-        if int(select) in selection:
-            fileSend = clients[client]['socket'].send
+                res = fileSendHelper(s, filePath, fileDest)
+                print "[%s]: %s" % (addr, res)
 
-        elif int(select) == 0:
-            fileSend = clients[selection[1]]['socket'].sendall
+        else:
 
-        fileSend('%s "%s" "%d"\n' % ('FILE', dest, fileSize))
-        time.sleep(1)
+            s = selected[1]["socket"]
+            addr = selected[1]["addr"][0]
 
-        while (data):
+            res = fileSendHelper(s, filePath, fileDest)
+            print "[%s]: %s" % (addr, res)
 
-            fileSend(data)
-            data = fileData.read(1024)
-
-        fileSend('')
-        fileData.close()
-
-        while clients[client].recv(16):
-            print clients[client].recv(16)
 
     else:
-        flag = True
-
-    if flag:
         raw_input('Invalid selection')
-        transfer_file()
+        transferFile()
 
     back_to_menu()
 
 def install_on_client ():
-    clientsHelper('Install on client: ', 'INST', install_on_client)
+    selected = selectionHelper()
+
+    if not selected:
+        back_to_menu()
+
+    clientsHelper({
+        "raw_input_text": "Install: ",
+        "prefix": "INST",
+        "selection": selected,
+    })
 
 def remove_on_client ():
-    clientsHelper('Remove on client: ', 'RMOV', remove_on_client)
+    selected = selectionHelper()
 
-def clientsHelper(prompt, prefix, cb):
+    if not selected:
+        back_to_menu()
 
+    clientsHelper({
+        "raw_input_text": "Remove: ",
+        "prefix": "RMOV",
+        "selection": selected,
+    })
+
+def selectionHelper ():
     clients = conns.getConnections()
+
     if clients.__len__() == 0:
-        print "No clients connected"
+        print "No clients connected!"
         back_to_menu()
 
     selection = {}
     i = 1
 
     for client in clients:
-        print "%d) %s" % (i, client)
-        selection[i] = client
+
+        s = clients[client]["socket"]
+        t = clients[client]["thread"]
+        addr = clients[client]["addr"]
+        ip = addr[0]
+        try:
+            hostname = socket.gethostbyaddr(ip)[0]
+        except:
+            hostname = "%s - cannot get hostname" % ip
+
+        print "%d) [%s %s]" % (i, ip, hostname)
+        selection[str(i)] = {"socket": s, "thread": t, "addr": addr}
         i = i + 1
 
-    select = raw_input('Select a client (0 for all):')
-    flag = False
+    userInput = raw_input('Select a client (0 for all): ')
 
-    if select.isdigit():
-        args = raw_input('%s' % prompt)
+    if userInput == "0":
 
-        if int(select) in selection:
-            selectedClient = clients[client]['socket']
-            selectedClient.send('%s "%s"' % (prefix, args))
+        selectedClients = {}
 
-        elif int(select) == 0:
-            selectedClient = clients[selection[1]]['socket']
-            selectedClient.sendall('%s "%s"' % args)
-        else:
-            flag = True
+        i = 1
+        for client in clients:
+            selectedClients[i] = clients[client]
+            i = i + 1
+
+        return selectedClients
+
     else:
-        flag = True
+        selected = selection.get(userInput, False)
 
-    if flag:
-        raw_input('Invalid selection')
-        cb()
+    if selected:
+        return {1: selection[userInput]}
+
+    return False
+
+
+
+
+def clientsHelper(options):
+
+    selection = options["selection"]
+    prefix = options["prefix"]
+    prompt = options["raw_input_text"]
+    cmd = raw_input(prompt)
+
+    if selection.__len__() > 1:
+
+        for client in selection:
+            s = selection[client]['socket']
+            addr = selection[client]['addr'][0]
+            s.send('%s "%s"' % (prefix, cmd))
+            res = s.recv(16)
+            print "[%s]: %s" % (addr, res)
+        time.sleep(1)
+
+    else:
+
+        s = selection[1]["socket"]
+        addr = selection[1]["addr"][0]
+        s.send('%s "%s"' % (prefix, cmd))
+        res = s.recv(16)
+        print "[%s]: %s" % (addr, res)
+        time.sleep(1)
 
     back_to_menu()
+
+def fileSendHelper (socket, filePath, fileDest):
+
+    fileSrc = open(filePath, 'rb')
+    fileSize = os.path.getsize(filePath)
+    fileData = fileSrc.read(1024)
+
+    socket.send('%s "%s" "%d"\n' % ('FILE', fileDest, fileSize))
+    time.sleep(1)
+
+    while (fileData):
+        socket.send(fileData)
+        fileData = fileSrc.read(1024)
+
+    fileSrc.close()
+
+    res = socket.recv(16)
+    return res
 
 def proccess_user_selection (option):
 
     user_select = {
-        1: show_clients,
-        2: send_commands,
-        3: transfer_file,
+        1: showClients,
+        2: sendCommand,
+        3: transferFile,
         4: install_on_client,
         5: remove_on_client
     }
