@@ -232,6 +232,7 @@ def clientsHelper(options):
     prefix = options["prefix"]
     prompt = options["raw_input_text"]
     cmd = raw_input(prompt)
+    bufferSize = 8194
 
     if selection.__len__() > 1:
 
@@ -239,8 +240,15 @@ def clientsHelper(options):
             s = selection[client]['socket']
             addr = selection[client]['addr'][0]
             s.send('%s "%s"' % (prefix, cmd))
-            res = s.recv(16)
-            print "[%s]: %s" % (addr, res)
+
+            while True:
+
+                res = s.recv(bufferSize)
+                print "[%s]: %s" % (addr, res)
+
+                if len(res) < bufferSize:
+                    break
+
         time.sleep(1)
 
     else:
@@ -248,8 +256,16 @@ def clientsHelper(options):
         s = selection[1]["socket"]
         addr = selection[1]["addr"][0]
         s.send('%s "%s"' % (prefix, cmd))
-        res = s.recv(16)
-        print "[%s]: %s" % (addr, res)
+
+        while True:
+
+            res = s.recv(bufferSize)
+            print "[%s]: %s" % (addr, res)
+
+            if len(res) < bufferSize:
+                break
+
+
         time.sleep(1)
 
     back_to_menu()

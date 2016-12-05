@@ -8,15 +8,17 @@ import os.path
 def runCmd(args):
     s = args["socket"]
     cmd = args["args"]
-    print "running command:", cmd
-    s.send('OK')
+
+    output = processCmd(cmd)
+    s.send(output)
 
 
 def installCmd(args):
     s = args["socket"]
-    cmd = args["args"]
-    print "installing:", cmd
-    s.send('OK')
+    toInstall = args["args"]
+
+    output = processCmd('apt-get install -y %s' % toInstall)
+    s.send(output)
 
 
 def fileCmd(args):
@@ -56,10 +58,10 @@ def fileCmd(args):
 
 def removeCmd(args):
     s = args["socket"]
-    cmd = args["args"]
-    print "removing:", cmd
-    s.send('OK')
+    toRemove = args["args"]
 
+    output = processCmd('apt-get remove -y %s' % toRemove)
+    s.send(output)
 
 def shellCmd(args):
     # TODO: improve shell this one sucks
@@ -89,6 +91,33 @@ def falseCmd(args):
     cmd = args["args"]
     print "Invalid command, args:", cmd
 
+def processCmd(cmd):
+    cmdSplit = cmd.split()
+    errFlag = False
+
+    try:
+        call = subprocess.Popen(cmdSplit, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=-1)
+    except:
+        call = subprocess.CalledProcessError.message
+        errFlag = True
+
+    if errFlag:
+        return 'failure\n\n%s' % str(call)
+
+    else:
+        call.wait()
+        out, err = call.communicate()
+
+        if call.returncode == 0:
+            return 'success\n\n%s' % out
+
+        elif call.returncode == 1:
+
+            return 'failure\n\n%s' % out
+
+        else:
+            assert call.returncode > 1
+            return 'failure\n\n%r' % (err,)
 
 def client(host, port):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
