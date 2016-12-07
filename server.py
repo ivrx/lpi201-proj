@@ -271,15 +271,19 @@ def fileSendHelper(socket, filePath, fileDest):
     fileData = fileSrc.read(1024)
 
     socket.send('%s "%s" "%d"\n' % ('FILE', fileDest, fileSize))
-    time.sleep(1)
-
-    while (fileData):
-        socket.send(fileData)
-        fileData = fileSrc.read(1024)
-
-    fileSrc.close()
-
     res = socket.recv(16)
+    time.sleep(0.5)
+
+    if res == "OK":
+
+        while (fileData):
+            socket.send(fileData)
+            fileData = fileSrc.read(1024)
+
+        fileSrc.close()
+
+        res = socket.recv(16)
+
     return res
 
 

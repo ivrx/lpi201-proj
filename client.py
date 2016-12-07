@@ -1,8 +1,5 @@
 #!/usr/bin/python
-import subprocess
-import sys
-import socket
-import os.path
+import subprocess, sys, socket, os.path
 
 
 def runCmd(args):
@@ -22,37 +19,38 @@ def installCmd(args):
 
 
 def fileCmd(args):
-    print "print in file transfer"
 
     s = args["socket"]
     dest = args["dest"]
     size = args["size"]
     bufferSize = 1024
-    fileRecv = open(dest, 'wb')
-    tmpSize = 0
+    flag = False
 
-    while True:
+    try:
+        fileRecv = open(dest, 'wb')
+    except:
+        flag = True
+
+    if not flag:
+        s.send("OK")
+
+    else:
+        s.send('Cannot save file')
+
+    while not flag:
 
         data = s.recv(bufferSize)
         fileRecv.write(data)
-        tmpSize += bufferSize
 
-        print "%d / %d" % (tmpSize, int(size))
-        print os.path.getsize(dest)
-
-        if tmpSize >= int(size):
-
-            print "data received, closing file"
+        if len(data) < bufferSize:
 
             fileRecv.close()
 
             if int(os.path.getsize(dest)) == int(size):
                 s.send('OK')
-                print "in OK"
                 break
             else:
                 s.send('ERR')
-                print "in ERR"
                 break
 
 
@@ -150,7 +148,6 @@ def client(host, port):
 
         else:
 
-            print data
             prefix = data.split()[0]
             args = {"args": data.split('"')[1], "socket": s}
 
